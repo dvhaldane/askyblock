@@ -1,0 +1,61 @@
+/*******************************************************************************
+ * This file is part of ASkyBlock.
+ *
+ *     ASkyBlock is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     ASkyBlock is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with ASkyBlock.  If not, see <http://www.gnu.org/licenses/>.
+ *******************************************************************************/
+
+package com.wasteofplastic.askyblock.events;
+
+import java.util.UUID;
+
+import org.spongepowered.api.event.cause.Cause;
+import org.spongepowered.api.world.Location;
+import org.spongepowered.api.world.World;
+
+import com.wasteofplastic.askyblock.Island;
+
+
+/**
+ * Fired when a player exits an island's area
+ * @author tastybento
+ *
+ */
+public class IslandExitEvent extends ASkyBlockEvent {
+    private final Location<World> location;
+
+    /**
+     * @param player
+     * @param island
+     * @param location
+     */
+    public IslandExitEvent(UUID player, Island island, Location<World> location) {
+        super(player,island);
+        this.location = location;
+    }
+
+    /**
+     * Location<World> of where the player exited the island
+     * @return the location
+     */
+    public Location<World> getLocation() {
+        return location;
+    }
+
+	@Override
+	public Cause getCause() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+}
