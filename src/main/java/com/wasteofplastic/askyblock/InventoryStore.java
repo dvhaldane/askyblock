@@ -17,7 +17,8 @@
 
 package com.wasteofplastic.askyblock;
 
-import org.spongepowered.api.item.inventory.ItemStack;
+import org.spongepowered.api.item.inventory.entity.PlayerInventory;
+import org.spongepowered.api.item.inventory.equipment.EquipmentInventory;
 
 /**
  * Where the inventory data is stored
@@ -26,14 +27,14 @@ import org.spongepowered.api.item.inventory.ItemStack;
  */
 public class InventoryStore {
 	
-    private ItemStack[] inventory;
-    private ItemStack[] armor;
+    private PlayerInventory inventory;
+    private EquipmentInventory armor;
 
     /**
      * @param inventory
      * @param armor
      */
-    public InventoryStore(ItemStack[] inventory, ItemStack[] armor) {
+    public InventoryStore(PlayerInventory inventory, EquipmentInventory armor) {
         this.inventory = inventory;
         this.armor = armor;
     }
@@ -41,7 +42,7 @@ public class InventoryStore {
     /**
      * @return the inventory
      */
-    public ItemStack[] getInventory() {
+    public PlayerInventory getInventory() {
         return inventory;
     }
 
@@ -49,14 +50,14 @@ public class InventoryStore {
      * @param inventory
      *            the inventory to set
      */
-    public void setInventory(ItemStack[] inventory) {
+    public void setInventory(PlayerInventory inventory) {
         this.inventory = inventory;
     }
 
     /**
      * @return the armor
      */
-    public ItemStack[] getArmor() {
+    public EquipmentInventory getArmor() {
         return armor;
     }
 
@@ -64,7 +65,7 @@ public class InventoryStore {
      * @param armor
      *            the armor to set
      */
-    public void setArmor(ItemStack[] armor) {
+    public void setArmor(EquipmentInventory armor) {
         this.armor = armor;
     }
 }
