@@ -352,7 +352,7 @@ public class ASkyBlock {
 		messages.loadMessages();
 		// Register world load event
 		if (getServer().getVersion().contains("(MC: 1.8") || plugin.getServer().getVersion().contains("(MC: 1.7")) {
-			getServer().getPluginManager().registerEvents(new WorldLoader(this), this);
+			Sponge.getEventManager().registerListeners(this, new WorldLoader(this));
 		}
 		// Metrics
 		try {

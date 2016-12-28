@@ -17,8 +17,10 @@
 
 package com.wasteofplastic.askyblock.util;
 
-import java.io.File;
-import java.lang.reflect.InvocationTargetException;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,6 +33,10 @@ import org.spongepowered.api.world.World;
 
 import com.wasteofplastic.askyblock.ASkyBlock;
 import com.wasteofplastic.askyblock.PlayerCache;
+
+import ninja.leaping.configurate.commented.CommentedConfigurationNode;
+import ninja.leaping.configurate.hocon.HoconConfigurationLoader;
+import ninja.leaping.configurate.loader.ConfigurationLoader;
 
 /**
  * A set of utility methods
@@ -47,36 +53,35 @@ public class Util {
 	 * @param file
 	 * @return
 	 */
-	public static YamlConfiguration loadYamlFile(String file) {
-		File dataFolder = plugin.getDataFolder();
-		File yamlFile = new File(dataFolder, file);
+	public static CommentedConfigurationNode loadFile(String file) {
 
-		YamlConfiguration config = null;
-		if (yamlFile.exists()) {
+		Path configFile = Paths.get(plugin.configDir() + file);
+		ConfigurationLoader<CommentedConfigurationNode> configLoader = HoconConfigurationLoader.builder().setPath(configFile).build();
+		CommentedConfigurationNode configNode = null;
+
+		if (!Files.exists(configFile)) {
 			try {
-				config = new YamlConfiguration();
-				config.load(yamlFile);
-			} catch (Exception e) {
+				plugin.getLogger().info("No " + file + " found. Creating it...");
+				if (Sponge.getAssetManager().getAsset(plugin, file).isPresent()) {
+					plugin.getLogger().info("Using default found in jar file.");
+					Sponge.getAssetManager().getAsset(plugin, file).get().copyToFile(configFile);
+					configNode = configLoader.load();
+				} else {
+					Files.createFile(configFile);
+					configNode = configLoader.load();
+				}
+			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		} else {
-			// Create the missing file
-			config = new YamlConfiguration();
-			plugin.getLogger().info("No " + file + " found. Creating it...");
 			try {
-				if (plugin.getResource(file) != null) {
-					plugin.getLogger().info("Using default found in jar file.");
-					plugin.saveResource(file, false);
-					config = new YamlConfiguration();
-					config.load(yamlFile);
-				} else {
-					config.save(yamlFile);
-				}
-			} catch (Exception e) {
-				plugin.getLogger().severe("Could not create the " + file + " file!");
+				configNode = configLoader.load();
+			} catch (IOException e) {
+				plugin.getLogger().info(file + " failed to load. Invalid! " + e);
 			}
 		}
-		return config;
+		
+		return configNode;
 	}
 
 	/**
@@ -85,13 +90,14 @@ public class Util {
 	 * @param yamlFile
 	 * @param fileLocation
 	 */
-	public static void saveYamlFile(YamlConfiguration yamlFile, String fileLocation) {
-		File dataFolder = plugin.getDataFolder();
-		File file = new File(dataFolder, fileLocation);
-
+	public static void saveFile(CommentedConfigurationNode file, String fileLocation) {
+		
+		Path configFile = Paths.get(plugin.configDir() + fileLocation);
+		ConfigurationLoader<CommentedConfigurationNode> configLoader = HoconConfigurationLoader.builder().setPath(configFile).build();
+		
 		try {
-			yamlFile.save(file);
-		} catch (Exception e) {
+			configLoader.save(file);
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
@@ -286,44 +292,5 @@ public class Util {
 			returned.add(p.getName());
 		}
 		return returned;
-	}
-
-	/**
-	 * Checks what version the server is running and picks the appropriate NMS
-	 * handler, or fallback
-	 * 
-	 * @return NMSAbstraction class
-	 * @throws ClassNotFoundException
-	 * @throws IllegalArgumentException
-	 * @throws SecurityException
-	 * @throws InstantiationException
-	 * @throws IllegalAccessException
-	 * @throws InvocationTargetException
-	 * @throws NoSuchMethodException
-	 */
-	public static NMSAbstraction checkVersion()
-			throws ClassNotFoundException, IllegalArgumentException, SecurityException, InstantiationException,
-			IllegalAccessException, InvocationTargetException, NoSuchMethodException {
-		String serverPackageName = Sponge.getServer().getClass().getPackage().getName();
-		String pluginPackageName = ASkyBlock.getPlugin().getClass().getPackage().getName();
-		String version = serverPackageName.substring(serverPackageName.lastIndexOf('.') + 1);
-		Class<?> clazz;
-		try {
-			// plugin.getLogger().info("Trying " + pluginPackageName + ".nms." +
-			// version + ".NMSHandler");
-			clazz = Class.forName(pluginPackageName + ".nms." + version + ".NMSHandler");
-		} catch (Exception e) {
-			plugin.getLogger().info("No NMS Handler found for " + version + ", falling back to Bukkit API.");
-			clazz = Class.forName(pluginPackageName + ".nms.fallback.NMSHandler");
-		}
-		// plugin.getLogger().info("DEBUG: " + serverPackageName);
-		// plugin.getLogger().info("DEBUG: " + pluginPackageName);
-		// Check if we have a NMSAbstraction implementing class at that
-		// location.
-		if (NMSAbstraction.class.isAssignableFrom(clazz)) {
-			return (NMSAbstraction) clazz.getConstructor().newInstance();
-		} else {
-			throw new IllegalStateException("Class " + clazz.getName() + " does not implement NMSAbstraction");
-		}
 	}
 }

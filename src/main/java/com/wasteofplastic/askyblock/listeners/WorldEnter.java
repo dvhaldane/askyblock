@@ -17,16 +17,14 @@
 
 package com.wasteofplastic.askyblock.listeners;
 
-import org.bukkit.Location;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.spongepowered.api.event.Listener;
+import org.spongepowered.api.world.Location;
+import org.spongepowered.api.world.World;
 
 import com.wasteofplastic.askyblock.ASkyBlock;
 import com.wasteofplastic.askyblock.Settings;
 
-public class WorldEnter implements Listener {
+public class WorldEnter {
     private ASkyBlock plugin;
     private final static boolean DEBUG = false;
 
@@ -34,7 +32,7 @@ public class WorldEnter implements Listener {
         this.plugin = aSkyBlock;
     }
 
-    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled=true)
+    @Listener
     public void onWorldEnter(final PlayerChangedWorldEvent event) {
         if (DEBUG)
             plugin.getLogger().info("DEBUG " + event.getEventName());
@@ -44,7 +42,7 @@ public class WorldEnter implements Listener {
         }
         if (DEBUG)
             plugin.getLogger().info("DEBUG correct world");
-        Location islandLoc = plugin.getPlayers().getIslandLocation(event.getPlayer().getUniqueId());
+        Location<World> islandLoc = plugin.getPlayers().getIslandLocation(event.getPlayer().getUniqueId());
         if (islandLoc == null) {
             if (DEBUG)
                 plugin.getLogger().info("DEBUG  no island");
@@ -56,7 +54,7 @@ public class WorldEnter implements Listener {
                 plugin.getLogger().info("DEBUG Make island");
         } else {
             // They have an island and are going to their own world
-            if (Settings.immediateTeleport && islandLoc.getWorld().equals(event.getPlayer().getWorld())) {
+            if (Settings.immediateTeleport && islandLoc.getExtent().equals(event.getPlayer().getWorld())) {
                 if (DEBUG)
                     plugin.getLogger().info("DEBUG teleport");
                 event.getPlayer().performCommand(Settings.ISLANDCOMMAND + " go");

@@ -17,15 +17,13 @@
 
 package com.wasteofplastic.askyblock.listeners;
 
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.world.ChunkLoadEvent;
+import org.spongepowered.api.event.Listener;
+import org.spongepowered.api.event.world.chunk.LoadChunkEvent;
 
 import com.wasteofplastic.askyblock.ASkyBlock;
 import com.wasteofplastic.askyblock.Settings;
 
-public class WorldLoader implements Listener {
+public class WorldLoader {
     private ASkyBlock plugin;
     private boolean worldLoaded = false;
     private static final boolean DEBUG = false;
@@ -38,14 +36,14 @@ public class WorldLoader implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
-    public void onChunkLoad(final ChunkLoadEvent event) {
+    @Listener
+    public void onChunkLoad(final LoadChunkEvent event) {
         if (worldLoaded) {
             return;
         }
         if (DEBUG)
-            plugin.getLogger().info("DEBUG: " + event.getEventName() + " : " + event.getWorld().getName());
-        if (event.getWorld().getName().equals(Settings.worldName) || event.getWorld().getName().equals(Settings.worldName + "_nether")) {
+            plugin.getLogger().info("DEBUG: " + event.toString() + " : " + event.getTargetChunk().getWorld().getName());
+        if (event.getTargetChunk().getWorld().getName().equals(Settings.worldName) || event.getTargetChunk().getWorld().getName().equals(Settings.worldName + "_nether")) {
             return;
         }
         // Load the world

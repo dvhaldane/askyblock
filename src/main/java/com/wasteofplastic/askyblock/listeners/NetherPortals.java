@@ -18,26 +18,21 @@ package com.wasteofplastic.askyblock.listeners;
 
 import java.util.UUID;
 
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.World;
-import org.bukkit.World.Environment;
-import org.bukkit.block.BlockState;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
-import org.bukkit.entity.Vehicle;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.event.entity.EntityExplodeEvent;
-import org.bukkit.event.entity.EntityPortalEvent;
-import org.bukkit.event.player.PlayerBucketEmptyEvent;
-import org.bukkit.event.player.PlayerPortalEvent;
-import org.bukkit.event.world.StructureGrowEvent;
-import org.bukkit.util.Vector;
+import org.spongepowered.api.block.BlockSnapshot;
+import org.spongepowered.api.block.BlockState;
+import org.spongepowered.api.block.BlockTypes;
+import org.spongepowered.api.data.Transaction;
+import org.spongepowered.api.entity.Entity;
+import org.spongepowered.api.event.Listener;
+import org.spongepowered.api.event.block.ChangeBlockEvent;
+import org.spongepowered.api.event.cause.Cause;
+import org.spongepowered.api.event.cause.NamedCause;
+import org.spongepowered.api.event.entity.MoveEntityEvent;
+import org.spongepowered.api.event.entity.explosive.DetonateExplosiveEvent;
+import org.spongepowered.api.world.DimensionTypes;
+import org.spongepowered.api.world.Location;
+import org.spongepowered.api.world.PortalAgentTypes;
+import org.spongepowered.api.world.World;
 
 import com.wasteofplastic.askyblock.ASkyBlock;
 import com.wasteofplastic.askyblock.GridManager;
@@ -47,9 +42,8 @@ import com.wasteofplastic.askyblock.SafeSpotTeleport;
 import com.wasteofplastic.askyblock.Settings;
 import com.wasteofplastic.askyblock.commands.IslandCmd;
 import com.wasteofplastic.askyblock.schematics.Schematic;
-import com.wasteofplastic.askyblock.util.VaultHelper;
 
-public class NetherPortals implements Listener {
+public class NetherPortals {
     private final ASkyBlock plugin;
     private final static boolean DEBUG = false;
 
@@ -63,34 +57,34 @@ public class NetherPortals implements Listener {
      * 
      * @param event
      */
-    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = false)
-    public void onEntityPortal(EntityPortalEvent event) {
+    @Listener
+    public void onEntityPortal(MoveEntityEvent.Teleport.Portal event) {
         if (DEBUG)
-            plugin.getLogger().info("DEBUG: nether portal entity " + event.getFrom().getBlock().getType());
+            plugin.getLogger().info("DEBUG: nether portal entity " + event.getTargetEntity());
         // If the nether is disabled then quit immediately
         if (!Settings.createNether || ASkyBlock.getNetherWorld() == null) {
             return;
         }
-        if (event.getEntity() == null) {
+        if (event.getTargetEntity() == null) {
             return;
         }
-        if (event.getFrom() != null && event.getFrom().getBlock().getType().equals(Material.ENDER_PORTAL)) {
+        if (event.getPortalAgent() != null && event.getFromTransform().getLocation().getBlock().getType().equals(BlockTypes.END_PORTAL)) {
             event.setCancelled(true);
             // Same action for all worlds except the end itself
-            if (!event.getFrom().getWorld().getEnvironment().equals(Environment.THE_END)) {
-                if (plugin.getServer().getWorld(Settings.worldName + "_the_end") != null) {
+            if (!event.getFromTransform().getExtent().getDimension().getType().equals(DimensionTypes.THE_END)) {
+                if (plugin.getServer().getWorld(Settings.worldName + "_the_end").isPresent()) {
                     // The end exists
-                    Location end_place = plugin.getServer().getWorld(Settings.worldName + "_the_end").getSpawnLocation();
-                    event.getEntity().teleport(end_place);
+                    Location<World> end_place = plugin.getServer().getWorld(Settings.worldName + "_the_end").get().getSpawnLocation();
+                    event.getTargetEntity().teleport(end_place);
                     if (DEBUG)
-                        plugin.getLogger().info("DEBUG: Result teleported " + event.getEntityType() + " to " + end_place);
+                        plugin.getLogger().info("DEBUG: Result teleported " + event.getTargetEntity() + " to " + end_place);
                     return;
                 }
             }
             return;
         }
-        Location currentLocation = event.getFrom().clone();
-        String currentWorld = currentLocation.getWorld().getName();
+        Location<World> currentLocation = event.getFromTransform().getLocation();
+        String currentWorld = currentLocation.getExtent().getName();
         // Only operate if this is Island territory
         if (!currentWorld.equalsIgnoreCase(Settings.worldName) && !currentWorld.equalsIgnoreCase(Settings.worldName + "_nether")) {
             return;
@@ -102,8 +96,8 @@ public class NetherPortals implements Listener {
         }
         // New nether
         // Entities can pass only if there are adjoining portals
-        Location dest = event.getFrom().toVector().toLocation(ASkyBlock.getIslandWorld());
-        if (event.getFrom().getWorld().getEnvironment().equals(Environment.NORMAL)) {
+        Location<World> dest = event.getFromTransform().toVector().toLocation(ASkyBlock.getIslandWorld());
+        if (event.getFromTransform().getExtent().getDimension().getType().equals(DimensionTypes.OVERWORLD)) {
             dest = event.getFrom().toVector().toLocation(ASkyBlock.getNetherWorld());
         }
         // Vehicles
@@ -353,26 +347,26 @@ public class NetherPortals implements Listener {
      * 
      * @param e
      */
-    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
-    public void onExplosion(final EntityExplodeEvent e) {
+    @Listener
+    public void onExplosion(final DetonateExplosiveEvent e) {
         if (Settings.newNether) {
             // Not used in the new nether
             return;
         }
         // Find out what is exploding
-        Entity expl = e.getEntity();
+        Entity expl = e.getTargetEntity();
         if (expl == null) {
             return;
         }
         // Check world
-        if (!e.getEntity().getWorld().getName().equalsIgnoreCase(Settings.worldName + "_nether")
-                || e.getEntity().getWorld().getName().equalsIgnoreCase(Settings.worldName + "_the_end")) {
+        if (!expl.getWorld().getName().equalsIgnoreCase(Settings.worldName + "_nether")
+                || expl.getWorld().getName().equalsIgnoreCase(Settings.worldName + "_the_end")) {
             return;
         }
-        Location spawn = e.getLocation().getWorld().getSpawnLocation();
-        Location loc = e.getLocation();
+        Location<World> spawn = expl.getWorld().getSpawnLocation();
+        Location<World> loc = expl.getLocation();
         if (spawn.distance(loc) < Settings.netherSpawnRadius) {
-            e.blockList().clear();
+            e..blockList().clear();
         }
     }
 
@@ -381,23 +375,23 @@ public class NetherPortals implements Listener {
      * 
      * @param e
      */
-    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
-    public void onTreeGrow(final StructureGrowEvent e) {
+    @Listener
+    public void onTreeGrow(final ChangeBlockEvent.Grow e) {
         if (DEBUG)
-            plugin.getLogger().info("DEBUG: " + e.getEventName());
+            plugin.getLogger().info("DEBUG: " + e);
 
         if (!Settings.newNether || !Settings.netherTrees) {
             return;
         }
         // Check world
-        if (!e.getLocation().getWorld().equals(ASkyBlock.getNetherWorld())) {
+        if (!e.getTargetWorld().equals(ASkyBlock.getNetherWorld())) {
             return;
         }
-        for (BlockState b : e.getBlocks()) {
-            if (b.getType() == Material.LOG || b.getType() == Material.LOG_2) {
-                b.setType(Material.GRAVEL);
-            } else if (b.getType() == Material.LEAVES || b.getType() == Material.LEAVES_2) {
-                b.setType(Material.GLOWSTONE);
+        for (Transaction<BlockSnapshot> b : e.getTransactions()) {
+            if (b.getFinal().getExtendedState().getType() == BlockTypes.LOG || b.getFinal().getExtendedState().getType() == BlockTypes.LOG2) {
+            	b.getFinal().getLocation().get().setBlock(BlockState.builder().blockType(BlockTypes.GRAVEL).build(), Cause.builder().build());
+            } else if (b.getFinal().getExtendedState().getType() == BlockTypes.LEAVES || b.getFinal().getExtendedState().getType() == BlockTypes.LEAVES2) {
+            	b.getFinal().getLocation().get().setBlock(BlockState.builder().blockType(BlockTypes.GLOWSTONE).build(), Cause.builder().build());
             }
         }
     }
