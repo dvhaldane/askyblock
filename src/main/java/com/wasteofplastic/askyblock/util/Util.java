@@ -45,7 +45,7 @@ import ninja.leaping.configurate.loader.ConfigurationLoader;
  * 
  */
 public class Util {
-	private static ASkyBlock plugin = ASkyBlock.getPlugin();
+	private static ASkyBlock instance = ASkyBlock.getInstance();
 
 	/**
 	 * Loads a YAML file and if it does not exist it is looked for in the JAR
@@ -55,16 +55,16 @@ public class Util {
 	 */
 	public static CommentedConfigurationNode loadFile(String file) {
 
-		Path configFile = Paths.get(plugin.configDir() + file);
+		Path configFile = Paths.get(instance.configDir() + file);
 		ConfigurationLoader<CommentedConfigurationNode> configLoader = HoconConfigurationLoader.builder().setPath(configFile).build();
 		CommentedConfigurationNode configNode = null;
 
 		if (!Files.exists(configFile)) {
 			try {
-				plugin.getLogger().info("No " + file + " found. Creating it...");
-				if (Sponge.getAssetManager().getAsset(plugin, file).isPresent()) {
-					plugin.getLogger().info("Using default found in jar file.");
-					Sponge.getAssetManager().getAsset(plugin, file).get().copyToFile(configFile);
+				instance.getLogger().info("No " + file + " found. Creating it...");
+				if (Sponge.getAssetManager().getAsset(instance, file).isPresent()) {
+					instance.getLogger().info("Using default found in jar file.");
+					Sponge.getAssetManager().getAsset(instance, file).get().copyToFile(configFile);
 					configNode = configLoader.load();
 				} else {
 					Files.createFile(configFile);
@@ -77,7 +77,7 @@ public class Util {
 			try {
 				configNode = configLoader.load();
 			} catch (IOException e) {
-				plugin.getLogger().info(file + " failed to load. Invalid! " + e);
+				instance.getLogger().info(file + " failed to load. Invalid! " + e);
 			}
 		}
 		
@@ -92,7 +92,7 @@ public class Util {
 	 */
 	public static void saveFile(CommentedConfigurationNode file, String fileLocation) {
 		
-		Path configFile = Paths.get(plugin.configDir() + fileLocation);
+		Path configFile = Paths.get(instance.configDir() + fileLocation);
 		ConfigurationLoader<CommentedConfigurationNode> configLoader = HoconConfigurationLoader.builder().setPath(configFile).build();
 		
 		try {

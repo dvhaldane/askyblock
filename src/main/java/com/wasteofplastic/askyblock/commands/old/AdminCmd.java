@@ -15,7 +15,7 @@
  *     along with ASkyBlock.  If not, see <http://www.gnu.org/licenses/>.
  *******************************************************************************/
 
-package com.wasteofplastic.askyblock.commands;
+package com.wasteofplastic.askyblock.commands.old;
 
 import java.io.File;
 import java.io.FileNotFoundException;

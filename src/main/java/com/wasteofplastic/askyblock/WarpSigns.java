@@ -16,6 +16,7 @@
  *******************************************************************************/
 package com.wasteofplastic.askyblock;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -29,10 +30,15 @@ import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.block.BlockTypes;
 import org.spongepowered.api.block.tileentity.Sign;
+import org.spongepowered.api.block.tileentity.TileEntity;
+import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.data.manipulator.immutable.tileentity.ImmutableSignData;
+import org.spongepowered.api.data.manipulator.mutable.tileentity.SignData;
+import org.spongepowered.api.data.value.mutable.Value;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.block.ChangeBlockEvent;
+import org.spongepowered.api.event.block.tileentity.ChangeSignEvent;
 import org.spongepowered.api.event.cause.Cause;
 import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.format.TextColors;
@@ -43,7 +49,8 @@ import com.wasteofplastic.askyblock.events.WarpCreateEvent;
 import com.wasteofplastic.askyblock.events.WarpListEvent;
 import com.wasteofplastic.askyblock.events.WarpRemoveEvent;
 import com.wasteofplastic.askyblock.util.Util;
-import com.wasteofplastic.askyblock.util.VaultHelper;
+
+import ninja.leaping.configurate.commented.CommentedConfigurationNode;
 
 /**
  * Handles warping in ASkyBlock Players can add one sign
@@ -57,7 +64,7 @@ public class WarpSigns {
 	// Map of all warps stored as player, warp sign Location
 	private HashMap<UUID, Location<World>> warpList = new HashMap<UUID, Location<World>>();
 	// Where warps are stored
-	private YamlConfiguration welcomeWarps;
+	private CommentedConfigurationNode welcomeWarps;
 
 	/**
 	 * @param plugin
@@ -86,7 +93,7 @@ public class WarpSigns {
 					// plugin.getLogger().info("DEBUG: sign found at location "
 					// + s.toString());
 					Player p = player.get();
-					if (s.get().get(0).equalsIgnoreCase(TextColors.GREEN + plugin.myLocale().warpswelcomeLine)) {
+					if (s.get().get(0).get().equals(TextColors.GREEN + plugin.myLocale().warpswelcomeLine)) {
 						// Do a quick check to see if this sign location is in
 						// plugin.getLogger().info("DEBUG: welcome sign");
 						// the list of warp signs
@@ -103,12 +110,12 @@ public class WarpSigns {
 								
 							} else if (p.hasPermission(Settings.PERMPREFIX + "mod.removesign")) {
 								// mod removed sign
-								p.sendMessage(Text.of(TextColors.GREEN + plugin.myLocale(p.getUniqueId()).warpsremoved));
+								p.sendMessage(Text.of(Text.of(TextColors.GREEN + plugin.myLocale(p.getUniqueId()).warpsremoved)));
 								removeWarp(location);
 								Sponge.getEventManager().post(new WarpRemoveEvent(plugin, location, p.getUniqueId()));
 							} else {
 								// Someone else's sign - not allowed
-								p.sendMessage(Text.of(TextColors.RED + plugin.myLocale(p.getUniqueId()).warpserrorNoRemove));
+								p.sendMessage(Text.of(Text.of(TextColors.RED + plugin.myLocale(p.getUniqueId()).warpserrorNoRemove)));
 								e.setCancelled(true);
 							}
 						}
@@ -123,59 +130,56 @@ public class WarpSigns {
 	 * 
 	 * @param e
 	 */
-	@EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = false)
-	public void onSignWarpCreate(SignChangeEvent e) {
+	@Listener
+	public void onSignWarpCreate(ChangeSignEvent e) {
 		// plugin.getLogger().info("DEBUG: SignChangeEvent called");
-		String title = e.getLine(0);
-		Player player = e.getPlayer();
+		Text title = e.getText().get(0).get();
+		Player player = e.getCause().first(Player.class).get();
 		if (player.getWorld().equals(ASkyBlock.getIslandWorld())
 				|| player.getWorld().equals(ASkyBlock.getNetherWorld())) {
 			// plugin.getLogger().info("DEBUG: Correct world");
-			if (e.getBlock().getType().equals(Material.SIGN_POST)
-					|| e.getBlock().getType().equals(Material.WALL_SIGN)) {
 
 				// plugin.getLogger().info("DEBUG: The first line of the sign
 				// says " + title);
 				// Check if someone is changing their own sign
 				// This should never happen !!
-				if (title.equalsIgnoreCase(plugin.myLocale().warpswelcomeLine)) {
+				if (title.equals(Text.of(plugin.myLocale().warpswelcomeLine))) {
 					// plugin.getLogger().info("DEBUG: Welcome sign detected");
 					// Welcome sign detected - check permissions
-					if (!(VaultHelper.checkPerm(player, Settings.PERMPREFIX + "island.addwarp"))) {
-						player.sendMessage(ChatColor.RED + plugin.myLocale(player.getUniqueId()).warpserrorNoPerm);
+					if (!player.hasPermission(Settings.PERMPREFIX + "island.addwarp")) {
+						player.sendMessage(Text.of(TextColors.RED + plugin.myLocale(player.getUniqueId()).warpserrorNoPerm));
 						return;
 					}
 					if (!(ASkyBlockAPI.getInstance()
 							.getIslandLevel(player.getUniqueId()) > Settings.warpLevelsRestriction)) {
-						player.sendMessage(
-								ChatColor.RED + plugin.myLocale(player.getUniqueId()).warpserrorNotEnoughLevel);
+						player.sendMessage(Text.of(Text.of(TextColors.RED + plugin.myLocale(player.getUniqueId()).warpserrorNotEnoughLevel)));
 						return;
 					}
 					// Check that the player is on their island
 					if (!(plugin.getGrid().playerIsOnIsland(player))) {
-						player.sendMessage(ChatColor.RED + plugin.myLocale(player.getUniqueId()).warpserrorNoPlace);
-						e.setLine(0, ChatColor.RED + plugin.myLocale().warpswelcomeLine);
+						player.sendMessage(Text.of(TextColors.RED + plugin.myLocale(player.getUniqueId()).warpserrorNoPlace));
+						e.getText().setElement(0, Text.of(TextColors.RED + plugin.myLocale().warpswelcomeLine));
 						return;
 					}
 					// Check if the player already has a sign
-					final Location oldSignLoc = getWarp(player.getUniqueId());
+					final Location<World> oldSignLoc = getWarp(player.getUniqueId());
 					if (oldSignLoc == null) {
 						// plugin.getLogger().info("DEBUG: Player does not have
 						// a sign already");
 						// First time the sign has been placed or this is a new
 						// sign
 						if (addWarp(player.getUniqueId(), e.getBlock().getLocation())) {
-							player.sendMessage(ChatColor.GREEN + plugin.myLocale(player.getUniqueId()).warpssuccess);
-							e.setLine(0, ChatColor.GREEN + plugin.myLocale().warpswelcomeLine);
+							player.sendMessage(Text.of(TextColors.GREEN + plugin.myLocale(player.getUniqueId()).warpssuccess));
+							e.getText().setElement(0, Text.of(TextColors.GREEN + plugin.myLocale().warpswelcomeLine));
 							for (int i = 1; i < 4; i++) {
-								e.setLine(i, ChatColor.translateAlternateColorCodes('&', e.getLine(i)));
+								e.setLine(i, TextColors.translateAlternateColorCodes('&', e.getLine(i)));
 							}
 						} else {
-							player.sendMessage(
-									ChatColor.RED + plugin.myLocale(player.getUniqueId()).warpserrorDuplicate);
-							e.setLine(0, ChatColor.RED + plugin.myLocale().warpswelcomeLine);
+							player.sendMessage(Text.of(
+									TextColors.RED + plugin.myLocale(player.getUniqueId()).warpserrorDuplicate);
+							e.setLine(0, TextColors.RED + plugin.myLocale().warpswelcomeLine);
 							for (int i = 1; i < 4; i++) {
-								e.setLine(i, ChatColor.translateAlternateColorCodes('&', e.getLine(i)));
+								e.setLine(i, TextColors.translateAlternateColorCodes('&', e.getLine(i)));
 							}
 						}
 					} else {
@@ -184,7 +188,7 @@ public class WarpSigns {
 						// A sign already exists. Check if it still there and if
 						// so,
 						// deactivate it
-						Block oldSignBlock = oldSignLoc.getBlock();
+						BlockState oldSignBlock = oldSignLoc.getBlock();
 						if (oldSignBlock.getType().equals(Material.SIGN_POST)
 								|| oldSignBlock.getType().equals(Material.WALL_SIGN)) {
 							// The block is still a sign
@@ -195,13 +199,13 @@ public class WarpSigns {
 								// plugin.getLogger().info("DEBUG: Sign block is
 								// a sign");
 								if (oldSign.getLine(0)
-										.equalsIgnoreCase(ChatColor.GREEN + plugin.myLocale().warpswelcomeLine)) {
+										.equalsIgnoreCase(TextColors.GREEN + plugin.myLocale().warpswelcomeLine)) {
 									// plugin.getLogger().info("DEBUG: Old sign
 									// had a green welcome");
-									oldSign.setLine(0, ChatColor.RED + plugin.myLocale().warpswelcomeLine);
+									oldSign.setLine(0, TextColors.RED + plugin.myLocale().warpswelcomeLine);
 									oldSign.update();
-									player.sendMessage(
-											ChatColor.RED + plugin.myLocale(player.getUniqueId()).warpsdeactivate);
+									player.sendMessage(Text.of(
+											TextColors.RED + plugin.myLocale(player.getUniqueId()).warpsdeactivate);
 									removeWarp(player.getUniqueId());
 									Bukkit.getPluginManager().callEvent(
 											new WarpRemoveEvent(plugin, oldSign.getLocation(), player.getUniqueId()));
@@ -210,16 +214,16 @@ public class WarpSigns {
 						}
 						// Set up the warp
 						if (addWarp(player.getUniqueId(), e.getBlock().getLocation())) {
-							player.sendMessage(ChatColor.GREEN + plugin.myLocale(player.getUniqueId()).warpssuccess);
-							e.setLine(0, ChatColor.GREEN + plugin.myLocale().warpswelcomeLine);
+							player.sendMessage(Text.of(TextColors.GREEN + plugin.myLocale(player.getUniqueId()).warpssuccess);
+							e.setLine(0, TextColors.GREEN + plugin.myLocale().warpswelcomeLine);
 						} else {
-							player.sendMessage(
-									ChatColor.RED + plugin.myLocale(player.getUniqueId()).warpserrorDuplicate);
-							e.setLine(0, ChatColor.RED + plugin.myLocale().warpswelcomeLine);
+							player.sendMessage(Text.of(
+									TextColors.RED + plugin.myLocale(player.getUniqueId()).warpserrorDuplicate);
+							e.setLine(0, TextColors.RED + plugin.myLocale().warpswelcomeLine);
 						}
 					}
 				}
-			}
+			
 		}
 	}
 
@@ -256,20 +260,15 @@ public class WarpSigns {
 	public void loadWarpList() {
 		plugin.getLogger().info("Loading warps...");
 		// warpList.clear();
-		welcomeWarps = Util.loadYamlFile("warps.yml");
-		if (welcomeWarps.getConfigurationSection("warps") == null) {
-			welcomeWarps.createSection("warps"); // This is only used to create
-			// the warp.yml file so forgive
-			// this code
-		}
+		welcomeWarps = Util.loadFile("warps.json");
 		HashMap<String, Object> temp = (HashMap<String, Object>) welcomeWarps.getConfigurationSection("warps")
 				.getValues(true);
 		for (String s : temp.keySet()) {
 			try {
 				UUID playerUUID = UUID.fromString(s);
-				Location l = Util.getLocationString((String) temp.get(s));
+				Location<World> l = Util.getLocationString((String) temp.get(s));
 				// plugin.getLogger().info("DEBUG: Loading warp at " + l);
-				Block b = l.getBlock();
+				BlockState b = l.getBlock();
 				// Check that a warp sign is still there
 				if (b.getType().equals(Material.SIGN_POST) || b.getType().equals(Material.WALL_SIGN)) {
 					warpList.put(playerUUID, l);
@@ -282,7 +281,7 @@ public class WarpSigns {
 						b.getRelative(BlockFace.DOWN).setType(Material.DIRT);
 						b.setType(Material.SIGN_POST);
 						Sign sign = (Sign) b.getState();
-						sign.setLine(0, ChatColor.GREEN + plugin.myLocale().warpswelcomeLine);
+						sign.setLine(0, TextColors.GREEN + plugin.myLocale().warpswelcomeLine);
 						sign.setLine(1, name);
 						sign.setLine(2, "Test 2");
 						sign.update();
@@ -290,7 +289,7 @@ public class WarpSigns {
 					// End test code
 				}
 			} catch (Exception e) {
-				plugin.getLogger().severe("Problem loading warp at location " + temp.get(s) + " - removing.");
+				plugin.getLogger().error("Problem loading warp at location " + temp.get(s) + " - removing.");
 				e.printStackTrace();
 			}
 		}
@@ -302,7 +301,7 @@ public class WarpSigns {
 	 * @param player
 	 * @param loc
 	 */
-	public boolean addWarp(final UUID player, final Location loc) {
+	public boolean addWarp(final UUID player, final Location<World> loc) {
 		// Do not allow warps to be in the same location
 		if (warpList.containsValue(loc)) {
 			return false;
@@ -321,7 +320,7 @@ public class WarpSigns {
 			public void run() {
 				plugin.getWarpPanel().addWarp(player);
 				plugin.getWarpPanel().updatePanel();
-				Bukkit.getPluginManager().callEvent(new WarpCreateEvent(plugin, loc, player));
+				Sponge.getEventManager().post(new WarpCreateEvent(plugin, loc, player));
 			}
 		});
 		return true;
@@ -356,14 +355,15 @@ public class WarpSigns {
 	 * 
 	 * @param loc
 	 */
-	private void popSign(Location loc) {
-		Block b = loc.getBlock();
-		if (b.getType().equals(Material.SIGN_POST) || b.getType().equals(Material.WALL_SIGN)) {
-			Sign s = (Sign) b.getState();
-			if (s != null) {
-				if (s.getLine(0).equalsIgnoreCase(ChatColor.GREEN + plugin.myLocale().warpswelcomeLine)) {
-					s.setLine(0, ChatColor.RED + plugin.myLocale().warpswelcomeLine);
-					s.update();
+	private void popSign(Location<World> loc) {
+		BlockState b = loc.getBlock();
+		if (b.getType().equals(BlockTypes.STANDING_SIGN) || b.getType().equals(BlockTypes.WALL_SIGN)) {
+			TileEntity signEntity = loc.getTileEntity().get();
+			Optional<SignData> s = signEntity.get(SignData.class);
+			if (s.isPresent()) {
+				if (s.get().get(0).equals(Text.of(TextColors.GREEN + plugin.myLocale().warpswelcomeLine))) {
+					s.get().setElement(0, Text.of(TextColors.RED + plugin.myLocale().warpswelcomeLine));
+					signEntity.offer(s.get());
 				}
 			}
 		}
@@ -374,21 +374,21 @@ public class WarpSigns {
 	 * 
 	 * @param loc
 	 */
-	public void removeWarp(Location loc) {
+	public void removeWarp(Location<World> loc) {
 		// plugin.getLogger().info("Asked to remove warp at " + loc);
 		popSign(loc);
-		Iterator<Entry<UUID, Location>> it = warpList.entrySet().iterator();
+		Iterator<Entry<UUID, Location<World>>> it = warpList.entrySet().iterator();
 		while (it.hasNext()) {
-			Entry<UUID, Location> en = it.next();
+			Entry<UUID, Location<World>> en = it.next();
 			if (en.getValue().equals(loc)) {
 				// Inform player
-				Player p = plugin.getServer().getPlayer(en.getKey());
+				Player p = plugin.getServer().getPlayer(en.getKey()).get();
 				if (p != null) {
 					// Inform the player
-					p.sendMessage(ChatColor.RED + plugin.myLocale(p.getUniqueId()).warpssignRemoved);
+					p.sendMessage(Text.of(TextColors.RED + plugin.myLocale(p.getUniqueId()).warpssignRemoved));
 				} else {
 					plugin.getMessages().setMessage(en.getKey(),
-							ChatColor.RED + plugin.myLocale(en.getKey()).warpssignRemoved);
+							TextColors.RED + plugin.myLocale(en.getKey()).warpssignRemoved);
 				}
 				it.remove();
 			}
@@ -411,21 +411,16 @@ public class WarpSigns {
 	 */
 	public Collection<UUID> listSortedWarps() {
 		// Bigger value of time means a more recent login
-		TreeMap<Long, UUID> map = new TreeMap<Long, UUID>();
+		TreeMap<Value<Instant>, UUID> map = new TreeMap<Value<Instant>, UUID>();
 		for (UUID uuid : warpList.keySet()) {
 			// If never played, will be zero
-			long lastPlayed = plugin.getServer().getOfflinePlayer(uuid).getLastPlayed();
-			// This aims to avoid the chance that players logged off at exactly
-			// the same time
-			if (!map.isEmpty() && map.containsKey(lastPlayed)) {
-				lastPlayed = map.firstKey() - 1;
-			}
+			Value<Instant> lastPlayed = plugin.getServer().getPlayer(uuid).get().lastPlayed();
 			map.put(lastPlayed, uuid);
 		}
 		Collection<UUID> result = map.descendingMap().values();
 		// Fire event
 		WarpListEvent event = new WarpListEvent(plugin, result);
-		plugin.getServer().getPluginManager().callEvent(event);
+		Sponge.getEventManager().post(event);
 		// Get the result of any changes by listeners
 		result = event.getWarps();
 		return result;
@@ -438,7 +433,7 @@ public class WarpSigns {
 	 *            - the warp requested
 	 * @return Location of warp
 	 */
-	public Location getWarp(UUID player) {
+	public Location<World> getWarp(UUID player) {
 		if (warpList.containsKey(player)) {
 			return warpList.get(player);
 		} else {
@@ -450,7 +445,7 @@ public class WarpSigns {
 	 * @param location
 	 * @return Name of warp owner
 	 */
-	public String getWarpOwner(Location location) {
+	public String getWarpOwner(Location<World> location) {
 		for (UUID playerUUID : warpList.keySet()) {
 			if (location.equals(warpList.get(playerUUID))) {
 				return plugin.getPlayers().getName(playerUUID);

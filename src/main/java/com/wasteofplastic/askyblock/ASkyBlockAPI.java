@@ -27,10 +27,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
+import org.spongepowered.api.world.biome.BiomeType;
 
-import com.wasteofplastic.askyblock.commands.Challenges;
+import com.wasteofplastic.askyblock.commands.old.Challenges;
 import com.wasteofplastic.askyblock.panels.SetBiome;
 
 /**
@@ -294,7 +296,7 @@ public class ASkyBlockAPI {
      * @param biomeType
      * @return true if the setting was successful
      */
-    public boolean setIslandBiome(Location<World> islandLoc, Biome biomeType) {
+    public boolean setIslandBiome(Location<World> islandLoc, BiomeType biomeType) {
         Island island = plugin.getGrid().getIslandAt(islandLoc);
         if (island != null) {
             new SetBiome(plugin, island, biomeType);

@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.UUID;
 
 import org.spongepowered.api.entity.living.player.Player;
+import org.spongepowered.api.item.inventory.entity.PlayerInventory;
 
 /**
  * Stashes inventories when required for a player
@@ -45,7 +46,8 @@ public class InventorySave {
     public void savePlayerInventory(Player player) {
         //plugin.getLogger().info("DEBUG: Saving inventory");
         // Save the player's armor and things
-        inventories.put(player.getUniqueId(),new InventoryStore(player.getInventory().getContents(), player.getInventory().getArmorContents()));
+    	PlayerInventory inv = (PlayerInventory) player.getInventory();
+        inventories.put(player.getUniqueId(),new InventoryStore(inv, inv.getEquipment()));
     }
 
     /**

@@ -21,6 +21,23 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+import org.spongepowered.api.data.manipulator.mutable.entity.DamageableData;
+import org.spongepowered.api.entity.Entity;
+import org.spongepowered.api.entity.EntityType;
+import org.spongepowered.api.entity.EntityTypes;
+import org.spongepowered.api.entity.living.player.Player;
+import org.spongepowered.api.entity.vehicle.Boat;
+import org.spongepowered.api.event.Listener;
+import org.spongepowered.api.event.entity.DamageEntityEvent;
+import org.spongepowered.api.event.entity.MoveEntityEvent;
+import org.spongepowered.api.event.entity.RideEntityEvent;
+import org.spongepowered.api.item.ItemTypes;
+import org.spongepowered.api.item.inventory.ItemStack;
+import org.spongepowered.api.world.Location;
+import org.spongepowered.api.world.World;
+
+import com.flowpowered.math.vector.Vector3d;
+
 /**
  * This file improves the safety of boats in AcidIsland It enables
  * players to get out of boats without being dropped into the acid. It
@@ -44,15 +61,12 @@ public class SafeBoat  {
      *            This event check throws the boat at a player when they hit it
      *            unless someone is in it
      */
-    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
-    public void onClick(VehicleDamageEvent e) {
+    @Listener
+    public void onClick(DamageEntityEvent e) {
         // plugin.getLogger().info("Damage event " + e.getDamage());
         // Find out what block is being clicked
-        Vehicle boat = e.getVehicle();
+    	Boat boat = (Boat) e.getTargetEntity();
         if (!(boat instanceof Boat)) {
-            return;
-        }
-        if (!boat.isEmpty()) {
             return;
         }
         final World playerWorld = boat.getWorld();
@@ -62,22 +76,19 @@ public class SafeBoat  {
         }
         // plugin.getLogger().info("Boat ");
         // Find out who is doing the clicking
-        if (!(e.getAttacker() instanceof Player)) {
+        if (!(e.getCause().first(Player.class).isPresent())) {
             // If a creeper blows up the boat, tough cookies!
             return;
         }
-        Player p = (Player) e.getAttacker();
-        if (p == null) {
-            return;
-        }
+        Player p = e.getCause().first(Player.class).get();
         // Try to remove the boat and throw it at the player
-        Location boatSpot = new Location(boat.getWorld(), boat.getLocation().getX(), boat.getLocation().getY() + 2, boat.getLocation().getZ());
-        Location throwTo = new Location(boat.getWorld(), p.getLocation().getX(), p.getLocation().getY() + 1, p.getLocation().getZ());
-        ItemStack newBoat = new ItemStack(Material.BOAT, 1);
+        Location<World> boatSpot = new Location<World>(boat.getWorld(), boat.getLocation().getX(), boat.getLocation().getY() + 2, boat.getLocation().getZ());
+        Location<World> throwTo = new Location<World>(boat.getWorld(), p.getLocation().getX(), p.getLocation().getY() + 1, p.getLocation().getZ());
+        EntityType newBoat = EntityTypes.BOAT;
         // Find the direction the boat should move in
-        Vector dir = throwTo.toVector().subtract(boatSpot.toVector()).normalize();
+        Vector3d dir = throwTo.toVector().subtract(boatSpot.toVector()).normalize();
         dir = dir.multiply(0.5);
-        Entity newB = boat.getWorld().dropItem(boatSpot, newBoat);
+        Entity newB = boat.getWorld().createEntity(newBoat, boatSpot.getPosition());
         newB.setVelocity(dir);
         boat.remove();
         e.setCancelled(true);
@@ -88,7 +99,7 @@ public class SafeBoat  {
      *            This function prevents boats from exploding when they hit
      *            something
      */
-    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = false)
+    @Listener
     public void onBoatHit(VehicleDestroyEvent e) {
         // plugin.getLogger().info("Vehicle destroyed event called");
         final Entity boat = e.getVehicle();
@@ -105,11 +116,11 @@ public class SafeBoat  {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGH)
-    public void onTeleport(final PlayerTeleportEvent e) {
+    @Listener
+    public void onTeleport(final MoveEntityEvent.Teleport e) {
         //
         // plugin.getLogger().info("DEBUG: Teleport called");
-        Player player = e.getPlayer();
+        Player player = (Player) e.getTargetEntity();
         if (SafeBoat.ignoreList.contains(player.getUniqueId())) {
             return;
         }
@@ -131,13 +142,13 @@ public class SafeBoat  {
                     for (int y = player.getLocation().getBlockY(); y < player.getLocation().getBlockY() + 2; y++) {
                         // The safe location to tp to is actually +0.5 to x and
                         // z.
-                        final Location loc = new Location(player.getWorld(), (double) (x + 0.5), (double) y, (double) (z + 0.5));
+                        final Location<World> loc = new Location<World>(player.getWorld(), (double) (x + 0.5), (double) y, (double) (z + 0.5));
                         // plugin.getLogger().info("XYZ is " + x + " " + y + " "
                         // + z);
                         // Make sure the location is safe
                         if (GridManager.isSafeLocation(loc)) {
                             // plugin.getLogger().info("Safe!");
-                            e.setTo(loc);
+                            e.getToTransform().setLocation(loc);
                             return;
                         }
                     }
@@ -151,16 +162,16 @@ public class SafeBoat  {
      *            This event aims to put the player in a safe place when they
      *            exit the boat
      */
-    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
-    public void onBoatExit(VehicleExitEvent e) {
-        final Entity boat = e.getVehicle();
-        if (!boat.getType().equals(EntityType.BOAT)) {
+    @Listener
+    public void onBoatExit(RideEntityEvent.Dismount e) {
+        final Entity boat = e.getTargetEntity();
+        if (!boat.getType().equals(EntityTypes.BOAT)) {
             // Not a boat
             return;
         }
         // LivingEntity entity = e.getExited();
-        final Entity entityObj = (Entity) e.getExited();
-        if (!(entityObj instanceof Player)) {
+        final Entity entityObj = e.getTargetEntity();
+        if (!(entityObj.getType().equals(EntityTypes.PLAYER))) {
             return;
         }
         final Player player = (Player) entityObj;

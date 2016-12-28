@@ -43,22 +43,25 @@ import org.spongepowered.api.entity.living.player.gamemode.GameMode;
 import org.spongepowered.api.event.EventManager;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.game.state.GamePreInitializationEvent;
+import org.spongepowered.api.event.service.ChangeServiceProviderEvent;
 import org.spongepowered.api.item.ItemType;
 import org.spongepowered.api.item.ItemTypes;
 import org.spongepowered.api.item.inventory.ItemStack;
 import org.spongepowered.api.plugin.Plugin;
+import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.plugin.PluginManager;
 import org.spongepowered.api.scoreboard.Scoreboard;
 import org.spongepowered.api.scoreboard.Team;
+import org.spongepowered.api.service.economy.EconomyService;
 import org.spongepowered.api.world.World;
 
 import com.google.inject.Inject;
 import com.wasteofplastic.askyblock.Island.Flags;
 import com.wasteofplastic.askyblock.NotSetup.Reason;
 import com.wasteofplastic.askyblock.Settings.GameType;
-import com.wasteofplastic.askyblock.commands.AdminCmd;
-import com.wasteofplastic.askyblock.commands.Challenges;
-import com.wasteofplastic.askyblock.commands.IslandCmd;
+import com.wasteofplastic.askyblock.commands.old.AdminCmd;
+import com.wasteofplastic.askyblock.commands.old.Challenges;
+import com.wasteofplastic.askyblock.commands.old.IslandCmd;
 import com.wasteofplastic.askyblock.events.IslandDeleteEvent;
 import com.wasteofplastic.askyblock.events.ReadyEvent;
 import com.wasteofplastic.askyblock.generators.ChunkGeneratorWorld;
@@ -66,7 +69,6 @@ import com.wasteofplastic.askyblock.listeners.AcidEffect;
 import com.wasteofplastic.askyblock.listeners.ChatListener;
 import com.wasteofplastic.askyblock.listeners.CleanSuperFlat;
 import com.wasteofplastic.askyblock.listeners.FlyingMobEvents;
-import com.wasteofplastic.askyblock.listeners.HeroChatListener;
 import com.wasteofplastic.askyblock.listeners.IslandGuard;
 import com.wasteofplastic.askyblock.listeners.IslandGuard1_8;
 import com.wasteofplastic.askyblock.listeners.IslandGuard1_9;
@@ -92,8 +94,10 @@ import ninja.leaping.configurate.loader.ConfigurationLoader;
  */
 @Plugin(id = "askyblock", name = "ASkyBlock", description = "A SkyBlock Plugin", authors = { "Tastybento", "rojo8399" })
 public class ASkyBlock {
+	// This instance
+	private static ASkyBlock instance;
 	// This plugin
-	private static ASkyBlock plugin;
+	private static PluginContainer plugin;
 	// The ASkyBlock world
 	private static World islandWorld = null;
 	private static World netherWorld = null;
@@ -125,8 +129,8 @@ public class ASkyBlock {
 	private WarpPanel warpPanel;
 	// Top Ten
 	private TopTen topTen;
-	// V1.8 or later
-	private boolean onePointEight;
+	// EconomyService
+	private EconomyService economyService;
 
 	private boolean debug = false;
 
@@ -195,8 +199,8 @@ public class ASkyBlock {
 	/**
 	 * @return ASkyBlock object instance
 	 */
-	public static ASkyBlock getPlugin() {
-		return plugin;
+	public static ASkyBlock getInstance() {
+		return instance;
 	}
 
 	/*
@@ -234,10 +238,24 @@ public class ASkyBlock {
 		}
 	}
 
+	/*
+	 * Listens for economy
+	 */
+	@Listener
+	public void onChangeServiceProvider(ChangeServiceProviderEvent event) {
+		if (event.getService().equals(EconomyService.class)) {
+			economyService = (EconomyService) event.getNewProviderRegistration().getProvider();
+		}
+	}
+
+	/*
+	 * TODO When the plugin loads
+	 */
 	@Listener
 	public void onInit(GamePreInitializationEvent event) {
 		// instance of this plugin
-		plugin = this;
+		instance = this;
+		plugin = game.getPluginManager().getPlugin("askyblock").get();
 
 		// Get challenges
 		challenges = new Challenges(this);
@@ -246,6 +264,23 @@ public class ASkyBlock {
 		playersFolder = new File(configDir() + File.separator + "players");
 		if (!playersFolder.exists()) {
 			playersFolder.mkdir();
+		}
+
+		players = new PlayerCache(this);
+
+		/*
+		 * TODO Setup Commands
+		 */
+
+		// Load messages
+		messages = new Messages(this);
+		messages.loadMessages();
+
+		// Metrics
+		try {
+			final Metrics metrics = new Metrics(game, plugin);
+			metrics.start();
+		} catch (final IOException localIOException) {
 		}
 
 	}
@@ -525,104 +560,6 @@ public class ASkyBlock {
 	}
 
 	/**
-	 * Checks to see if there are any plugin updates Called when reloading
-	 * settings too
-	 */
-	public void checkUpdates() {
-		// Version checker
-		getLogger().info("Checking for new updates...");
-		getServer().getScheduler().runTaskAsynchronously(this, new Runnable() {
-			@Override
-			public void run() {
-				if (Settings.GAMETYPE.equals(GameType.ASKYBLOCK)) {
-					updateCheck = new Update(85189); // ASkyBlock
-				} else {
-					updateCheck = new Update(80095); // AcidIsland
-				}
-				if (!updateCheck.isSuccess()) {
-					updateCheck = null;
-				}
-			}
-		});
-	}
-
-	public void checkUpdatesNotify(Player p) {
-		boolean update = false;
-		final String pluginVersion = plugin.getDescription().getVersion();
-		// Check to see if the latest file is newer that this one
-		String[] split = plugin.getUpdateCheck().getVersionName().split(" V");
-		// Only do this if the format is what we expect
-		if (split.length == 2) {
-			// getLogger().info("DEBUG: " + split[1]);
-			// Need to escape the period in the regex expression
-			String[] updateVer = split[1].split("\\.");
-			// getLogger().info("DEBUG: split length = " + updateVer.length);
-			// CHeck the version #'s
-			String[] pluginVer = pluginVersion.split("\\.");
-			// getLogger().info("DEBUG: split length = " + pluginVer.length);
-			// Run through major, minor, sub
-			for (int i = 0; i < Math.max(updateVer.length, pluginVer.length); i++) {
-				try {
-					int updateCheck = 0;
-					if (i < updateVer.length) {
-						updateCheck = Integer.valueOf(updateVer[i]);
-					}
-					int pluginCheck = 0;
-					if (i < pluginVer.length) {
-						pluginCheck = Integer.valueOf(pluginVer[i]);
-					}
-					// getLogger().info("DEBUG: update is " + updateCheck + "
-					// plugin is " + pluginCheck);
-					if (updateCheck < pluginCheck) {
-						// getLogger().info("DEBUG: plugin is newer!");
-						// plugin is newer
-						update = false;
-						break;
-					} else if (updateCheck > pluginCheck) {
-						// getLogger().info("DEBUG: update is newer!");
-						update = true;
-						break;
-					}
-				} catch (Exception e) {
-					getLogger().warning("Could not determine update's version # ");
-					getLogger().warning("Plugin version: " + pluginVersion);
-					getLogger().warning("Update version: " + plugin.getUpdateCheck().getVersionName());
-					return;
-				}
-			}
-		}
-		// Show the results
-		if (p != null) {
-			if (!update) {
-				return;
-			} else {
-				// Player login
-				p.sendMessage(ChatColor.GOLD + plugin.getUpdateCheck().getVersionName()
-						+ " is available! You are running " + pluginVersion);
-				if (Settings.GAMETYPE.equals(GameType.ASKYBLOCK)) {
-					p.sendMessage(ChatColor.RED + "Update at: http://dev.bukkit.org/bukkit-plugins/skyblock");
-				} else {
-					p.sendMessage(ChatColor.RED + "Update at: http://dev.bukkit.org/bukkit-plugins/acidisland");
-				}
-			}
-		} else {
-			// Console
-			if (!update) {
-				getLogger().info("No updates available.");
-				return;
-			} else {
-				getLogger().info(
-						plugin.getUpdateCheck().getVersionName() + " is available! You are running " + pluginVersion);
-				if (Settings.GAMETYPE.equals(GameType.ASKYBLOCK)) {
-					getLogger().info("Update at: http://dev.bukkit.org/bukkit-plugins/skyblock");
-				} else {
-					getLogger().info("Update at: http://dev.bukkit.org/bukkit-plugins/acidisland");
-				}
-			}
-		}
-	}
-
-	/**
 	 * Delete Island Called when an island is restarted or reset
 	 *
 	 * @param player
@@ -670,11 +607,6 @@ public class ASkyBlock {
 		return challenges;
 	}
 
-	@Override
-	public ChunkGenerator getDefaultWorldGenerator(final String worldName, final String id) {
-		return new ChunkGeneratorWorld();
-	}
-
 	/**
 	 * @return the grid
 	 */
@@ -700,21 +632,6 @@ public class ASkyBlock {
 	 */
 	public File getPlayersFolder() {
 		return playersFolder;
-	}
-
-	/**
-	 * @return the updateCheck
-	 */
-	public Update getUpdateCheck() {
-		return updateCheck;
-	}
-
-	/**
-	 * @param updateCheck
-	 *            the updateCheck to set
-	 */
-	public void setUpdateCheck(Update updateCheck) {
-		this.updateCheck = updateCheck;
 	}
 
 	/**
@@ -1700,12 +1617,12 @@ public class ASkyBlock {
 	}
 
 	public void restartEvents() {
-		final PluginManager manager = getServer().getPluginManager();
+		final EventManager manager = game.getEventManager();
 		lavaListener = new LavaCheck(this);
-		manager.registerEvents(lavaListener, this);
+		manager.registerListeners(this, lavaListener);
 		// Enables warp signs in ASkyBlock
 		warpSignsListener = new WarpSigns(this);
-		manager.registerEvents(warpSignsListener, this);
+		manager.registerListeners(this, warpSignsListener);
 	}
 
 	/**
@@ -1724,21 +1641,16 @@ public class ASkyBlock {
 		this.newIsland = newIsland;
 	}
 
-	public void unregisterEvents() {
-		HandlerList.unregisterAll(warpSignsListener);
-		HandlerList.unregisterAll(lavaListener);
-	}
-
 	/**
 	 * @return the netherWorld
 	 */
 	public static World getNetherWorld() {
 		if (netherWorld == null && Settings.createNether) {
 			if (Settings.useOwnGenerator) {
-				return Bukkit.getServer().getWorld(Settings.worldName + "_nether");
+				return Sponge.getServer().getWorld(Settings.worldName + "_nether").get();
 			}
-			if (plugin.getServer().getWorld(Settings.worldName + "_nether") == null) {
-				Bukkit.getLogger().info("Creating " + plugin.getName() + "'s Nether...");
+			if (Sponge.getServer().getWorld(Settings.worldName + "_nether") == null) {
+				getInstance().getLogger().info("Creating " + plugin.getName() + "'s Nether...");
 			}
 			if (!Settings.newNether) {
 				netherWorld = WorldCreator.name(Settings.worldName + "_nether").type(WorldType.NORMAL)
@@ -1817,7 +1729,7 @@ public class ASkyBlock {
 		if (warpPanel == null) {
 			// Probably due to a reload
 			warpPanel = new WarpPanel(this);
-			getServer().getPluginManager().registerEvents(warpPanel, plugin);
+			game.getEventManager().registerListeners(warpPanel, plugin);
 		}
 		return warpPanel;
 	}
