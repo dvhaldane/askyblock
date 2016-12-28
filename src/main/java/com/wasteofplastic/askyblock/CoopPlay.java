@@ -212,9 +212,10 @@ public class CoopPlay {
 	}
 
 	public void saveCoops() {
-		File coopFile = new File(plugin.getDataFolder(), "coops.yml");
-		YamlConfiguration coopConfig = new YamlConfiguration();
+		File coopFile = new File(plugin.configDir(), "coops.yml");
+		Util.loadFile("coops.yml");
 		for (UUID playerUUID : coopPlayers.keySet()) {
+			
 			coopConfig.set(playerUUID.toString(), getMyCoops(playerUUID));
 		}
 		try {
@@ -225,16 +226,8 @@ public class CoopPlay {
 	}
 
 	public void loadCoops() {
-		File coopFile = new File(plugin.configDir, "coops.yml");
-		if (!coopFile.exists()) {
-			return;
-		}
-		YamlConfiguration coopConfig = new YamlConfiguration();
-		try {
-			coopConfig.load(coopFile);
-		} catch (IOException | InvalidConfigurationException e) {
-			plugin.getLogger().error("Could not load coop.yml file!");
-		}
+		CommentedConfigurationNode coopConfig = Util.loadFile("coops.yml");
+		
 		// Run through players
 		for (String playerUUID : coopConfig.getValues(false).keySet()) {
 			try {
