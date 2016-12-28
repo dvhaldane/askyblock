@@ -29,11 +29,13 @@ import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
 
+import com.google.common.reflect.TypeToken;
 import com.wasteofplastic.askyblock.events.TeamJoinEvent;
 import com.wasteofplastic.askyblock.events.TeamLeaveEvent;
 import com.wasteofplastic.askyblock.util.Util;
 
-import ninja.leaping.configurate.yaml.YAMLConfigurationLoader;
+import ninja.leaping.configurate.commented.CommentedConfigurationNode;
+import ninja.leaping.configurate.objectmapping.ObjectMappingException;
 
 /**
  * Tracks the following info on the player
@@ -42,7 +44,7 @@ import ninja.leaping.configurate.yaml.YAMLConfigurationLoader;
  */
 public class Players {
 	private ASkyBlock plugin;
-	private YamlConfiguration playerInfo;
+	private CommentedConfigurationNode playerInfo;
 	private HashMap<String, Boolean> challengeList;
 	private HashMap<String, Integer> challengeListTimes;
 	private boolean hasIsland;
@@ -94,125 +96,142 @@ public class Players {
 	}
 
 	/**
-     * Loads a player from file system and if they do not exist, then it is
-     * created
-     * 
-     * @param uuid
-     */
-    public void load(UUID uuid) {
-        playerInfo = Util.loadYamlFile("players/" + uuid.toString() + ".yml");
-        // Load in from YAML file
-        this.playerName = playerInfo.getString("playerName", "");
-        if (playerName.isEmpty()) {
-            try {
-                playerName = plugin.getServer().getOfflinePlayer(uuid).getName();
-            } catch (Exception e) {
-                plugin.getLogger().error("Could not obtain a name for the player with UUID " + uuid.toString());
-                playerName = "";
-            }
-            if (playerName == null) {
-                plugin.getLogger().error("Could not obtain a name for the player with UUID " + uuid.toString());
-                playerName = "";
-            }
-        }
-        // Start island rating - how difficult the start island was. Default if 50/100
-        this.startIslandRating = playerInfo.getInt("startIslandRating", 50);
-        // Locale
-        this.locale = playerInfo.getString("locale","");
-        // Ban list
-        List<String> banListString = playerInfo.getStringList("banList");
-        for (String uuidString : banListString) {
-            try {
-                banList.add(UUID.fromString(uuidString));
-            } catch (Exception e) {}
-        }
-        // plugin.getLogger().info("Loading player..." + playerName);
-        this.hasIsland = playerInfo.getBoolean("hasIsland", false);
-        // plugin.getLogger().info("DEBUG: hasIsland load = " + this.hasIsland);
-        this.islandLocation<World> = playerInfo.getString("islandLocation", "");
-        // Old home Location<World> storage
-        Location<World> homeLocation<World> = Util.getLocationString(playerInfo.getString("homeLocation",""));
-        // New home Location<World> storage
-        if (homeLocation<World> != null) {
-            // Transfer the old into the new
-            this.homeLocations.put(1,homeLocation);
-        } else {
-            // Import
-            if (playerInfo.contains("homeLocations")) {
-                // Import to hashmap
-                for (String number : playerInfo.getConfigurationSection("homeLocations").getValues(false).keySet()) {
-                    try {
-                        int num = Integer.valueOf(number);
-                        Location<World> loc = Util.getLocationString(playerInfo.getString("homeLocations." + number));
-                        homeLocations.put(num, loc);
-                    } catch (Exception e) {
-                        plugin.getLogger().error("Error importing home locations for " + playerName);
-                    }
-                }
-            }
-        }
-        this.inTeam = playerInfo.getBoolean("hasTeam", false);
-        final String teamLeaderString = playerInfo.getString("teamLeader", "");
-        if (!teamLeaderString.isEmpty()) {
-            this.teamLeader = UUID.fromString(teamLeaderString);
-        } else {
-            this.teamLeader = null;
-        }
-        this.teamIslandLocation = playerInfo.getString("teamIslandLocation", "");
-        this.islandLevel = playerInfo.getInt("islandLevel", 0);
-        List<String> temp = playerInfo.getStringList("members");
-        for (String s : temp) {
-            this.members.add(UUID.fromString(s));
-        }
-        // Challenges
-        // Run through all challenges available
-        for (String challenge : Settings.challengeList) {
-            // If they are in the list, then use the value, otherwise use false
-            challengeList.put(challenge.toLowerCase(), playerInfo.getBoolean("challenges.status." + challenge.toLowerCase().replace(".", "[dot]"), false));
-            challengeListTimes.put(challenge.toLowerCase(), playerInfo.getInt("challenges.times." + challenge.toLowerCase().replace(".", "[dot]"), 0));
-        }
-        for (String challenge : Settings.challengeLevels) {
-            // If they are in the list, then use the value, otherwise use false
-            challengeList.put(challenge.toLowerCase(), playerInfo.getBoolean("challenges.status." + challenge.toLowerCase().replace(".", "[dot]"), false));
-            challengeListTimes.put(challenge.toLowerCase(), playerInfo.getInt("challenges.times." + challenge.toLowerCase().replace(".", "[dot]"), 0));
-        }
-        // Load reset limit
-        this.resetsLeft = playerInfo.getInt("resetsLeft", Settings.resetLimit);
-        // Check what the global limit is and raise it if it was changed
-        if (Settings.resetLimit > 0 && this.resetsLeft == -1) {
-            resetsLeft = Settings.resetLimit;
-        }
-        // Deaths
-        this.deaths = playerInfo.getInt("deaths", 0);
-        // Load control panel setting
-        useControlPanel = playerInfo.getBoolean("useControlPanel", Settings.useControlPanel);
-        // Load the invite cool downs
-        if (playerInfo.contains("invitecooldown")) {
-            // plugin.getLogger().info("DEBUG: cooldown found");
-            for (String timeIndex : playerInfo.getConfigurationSection("invitecooldown").getKeys(false)) {
-                try {
-                    // plugin.getLogger().info("DEBUG: index is " + timeIndex);
-                    String locationString = playerInfo.getString("invitecooldown." + timeIndex, "");
-                    // plugin.getLogger().info("DEBUG: Location<World> string is " +
-                    // locationString);
-                    Location<World> l = Util.getLocationString(locationString);
-                    // plugin.getLogger().info("DEBUG: Location<World> is " + l);
-                    long timeInMillis = Long.valueOf(timeIndex);
-                    // plugin.getLogger().info("DEBUG: time in millis is " +
-                    // timeInMillis);
-                    if (l != null && timeInMillis > 0) {
-                        Date date = new Date();
-                        date.setTime(timeInMillis);
-                        // plugin.getLogger().info("DEBUG: date is " + date);
-                        // Insert into hashmap
-                        kickedList.put(l, date);
-                    }
-                } catch (Exception e) {
-                    plugin.getLogger().error("Error in player " + playerName + "'s yml config when loading invite timeout - skipping");
-                }
-            }
-        }
-    }
+	 * Loads a player from file system and if they do not exist, then it is
+	 * created
+	 * 
+	 * @param uuid
+	 */
+	public void load(UUID uuid) {
+		playerInfo = Util.loadFile("players/" + uuid.toString() + ".json");
+		// Load in from YAML file
+		this.playerName = playerInfo.getNode("playerName").getString();
+		if (playerName.isEmpty()) {
+			if (plugin.getServer().getPlayer(uuid).isPresent()) {
+				playerName = plugin.getServer().getPlayer(uuid).get().getName();
+			} else {
+				plugin.getLogger().error("Could not obtain a name for the player with UUID " + uuid.toString());
+				playerName = "";
+			}
+		}
+		// Start island rating - how difficult the start island was. Default if
+		// 50/100
+		this.startIslandRating = playerInfo.getNode("startIslandRating").getInt(50);
+		// Locale
+		this.locale = playerInfo.getNode("locale").getString("");
+		// Ban list
+		List<String> banListString;
+		try {
+			banListString = playerInfo.getNode("banList").getList(TypeToken.of(String.class));
+			for (String uuidString : banListString) {
+				try {
+					banList.add(UUID.fromString(uuidString));
+				} catch (Exception e) {
+				}
+			}
+		} catch (ObjectMappingException e2) {
+			// TODO Auto-generated catch block
+			e2.printStackTrace();
+		}
+		// plugin.getLogger().info("Loading player..." + playerName);
+		this.hasIsland = playerInfo.getNode("hasIsland").getBoolean(false);
+		// plugin.getLogger().info("DEBUG: hasIsland load = " + this.hasIsland);
+		this.islandLocation = playerInfo.getNode("islandLocation").getString("");
+		// Old home Location<World> storage
+		Location<World> homeLocation = Util.getLocationString(playerInfo.getNode("homeLocation").getString(""));
+		// New home Location<World> storage
+		if (homeLocation != null) {
+			// Transfer the old into the new
+			this.homeLocations.put(1, homeLocation);
+		} else {
+			// Import
+			if (playerInfo.getNode("homeLocations").hasMapChildren()) {
+				// Import to hashmap
+				for (Object number : playerInfo.getNode("homeLocations").getChildrenMap().keySet()) {
+					try {
+						int num = Integer.valueOf(number.toString());
+						Location<World> loc = Util.getLocationString(playerInfo.getString("homeLocations." + number));
+						homeLocations.put(num, loc);
+					} catch (Exception e) {
+						plugin.getLogger().error("Error importing home locations for " + playerName);
+					}
+				}
+			}
+		}
+		this.inTeam = playerInfo.getNode("hasTeam").getBoolean(false);
+		final String teamLeaderString = playerInfo.getNode("teamLeader").getString("");
+		if (!teamLeaderString.isEmpty()) {
+			this.teamLeader = UUID.fromString(teamLeaderString);
+		} else {
+			this.teamLeader = null;
+		}
+		this.teamIslandLocation = playerInfo.getNode("teamIslandLocation").getString("");
+		this.islandLevel = playerInfo.getNode("islandLevel").getInt(0);
+		List<String> temp;
+		try {
+			temp = playerInfo.getNode("members").getList(TypeToken.of(String.class));
+			for (String s : temp) {
+				this.members.add(UUID.fromString(s));
+			}
+		} catch (ObjectMappingException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		// Challenges
+		// Run through all challenges available
+		for (String challenge : Settings.challengeList) {
+			// If they are in the list, then use the value, otherwise use false
+			challengeList.put(challenge.toLowerCase(), playerInfo
+					.getNode("challenges", "status", challenge.toLowerCase().replace(".", "[dot]")).getBoolean(false));
+			challengeListTimes.put(challenge.toLowerCase(),
+					playerInfo.getNode("challenges", "times", challenge.toLowerCase().replace(".", "[dot]")).getInt(0));
+		}
+		for (String challenge : Settings.challengeLevels) {
+			// If they are in the list, then use the value, otherwise use false
+			challengeList.put(challenge.toLowerCase(), playerInfo
+					.getNode("challenges", "status", challenge.toLowerCase().replace(".", "[dot]")).getBoolean(false));
+			challengeListTimes.put(challenge.toLowerCase(),
+					playerInfo.getNode("challenges", "times", challenge.toLowerCase().replace(".", "[dot]")).getInt(0));
+		}
+		// Load reset limit
+		this.resetsLeft = playerInfo.getNode("resetsLeft").getInt(Settings.resetLimit);
+		// Check what the global limit is and raise it if it was changed
+		if (Settings.resetLimit > 0 && this.resetsLeft == -1) {
+			resetsLeft = Settings.resetLimit;
+		}
+		// Deaths
+		this.deaths = playerInfo.getNode("deaths").getInt(0);
+		// Load control panel setting
+		useControlPanel = playerInfo.getNode("useControlPanel").getBoolean(Settings.useControlPanel);
+		// Load the invite cool downs
+		if (playerInfo.getNode("invitecooldown").hasMapChildren()) {
+			// plugin.getLogger().info("DEBUG: cooldown found");
+			for (Object timeIndex : playerInfo.getNode("invitecooldown").getChildrenMap().keySet()) {
+				try {
+					// plugin.getLogger().info("DEBUG: index is " + timeIndex);
+					String locationString = playerInfo.getNode("invitecooldown", timeIndex.toString()).getString("");
+					// plugin.getLogger().info("DEBUG: Location<World> string is
+					// " +
+					// locationString);
+					Location<World> l = Util.getLocationString(locationString);
+					// plugin.getLogger().info("DEBUG: Location<World> is " +
+					// l);
+					long timeInMillis = Long.valueOf(timeIndex.toString());
+					// plugin.getLogger().info("DEBUG: time in millis is " +
+					// timeInMillis);
+					if (l != null && timeInMillis > 0) {
+						Date date = new Date();
+						date.setTime(timeInMillis);
+						// plugin.getLogger().info("DEBUG: date is " + date);
+						// Insert into hashmap
+						kickedList.put(l, date);
+					}
+				} catch (Exception e) {
+					plugin.getLogger().error(
+							"Error in player " + playerName + "'s yml config when loading invite timeout - skipping");
+				}
+			}
+		}
+	}
 
 	/**
 	 * Saves the player info to the file system
@@ -220,88 +239,91 @@ public class Players {
 	public void save() {
 		// plugin.getLogger().info("Saving player..." + playerName);
 		// Save the variables
-		playerInfo.set("playerName", playerName);
-		playerInfo.set("hasIsland", hasIsland);
+		playerInfo.getNode("playerName").setValue(playerName);
+		playerInfo.getNode("hasIsland").setValue(hasIsland);
 		if (hasIsland && !banList.isEmpty()) {
 			List<String> banListString = new ArrayList<String>();
 			for (UUID bannedUUID : banList) {
 				banListString.add(bannedUUID.toString());
 			}
-			playerInfo.set("banList", banListString);
+			playerInfo.getNode("banList").setValue(banListString);
 		} else {
 			// Clear
-			playerInfo.set("banList", null);
+			playerInfo.getNode("banList").setValue(null);
 		}
-		playerInfo.set("islandLocation", islandLocation);
-		playerInfo.set("homeLocation", null);
+		playerInfo.getNode("islandLocation").setValue(islandLocation);
+		playerInfo.getNode("homeLocation").setValue(null);
 		// Only store the new way
 		// Clear any old home locations
-		playerInfo.set("homeLocations", null);
+		playerInfo.getNode("homeLocations").setValue(null);
 		for (int num : homeLocations.keySet()) {
-			playerInfo.set("homeLocations." + num, Util.getStringLocation(homeLocations.get(num)));
+			playerInfo.getNode("homeLocations." + num).setValue(Util.getStringLocation(homeLocations.get(num)));
 		}
-		playerInfo.set("hasTeam", inTeam);
+		playerInfo.getNode("hasTeam").setValue(inTeam);
 		if (teamLeader == null) {
-			playerInfo.set("teamLeader", "");
+			playerInfo.getNode("teamLeader").setValue("");
 		} else {
-			playerInfo.set("teamLeader", teamLeader.toString());
+			playerInfo.getNode("teamLeader").setValue(teamLeader.toString());
 		}
-		playerInfo.set("teamIslandLocation", teamIslandLocation);
-		playerInfo.set("islandLevel", islandLevel);
+		playerInfo.getNode("teamIslandLocation").setValue(teamIslandLocation);
+		playerInfo.getNode("islandLevel").setValue(islandLevel);
 		// Serialize UUIDs
 		List<String> temp = new ArrayList<String>();
 		for (UUID m : members) {
 			temp.add(m.toString());
 		}
-		playerInfo.set("members", temp);
+		playerInfo.getNode("members").setValue(temp);
 		// Save the challenges
-		playerInfo.set("challenges", null);
+		playerInfo.getNode("challenges").setValue(null);
 		for (String challenge : challengeList.keySet()) {
 			// plugin.getLogger().info("DEBUG: " + challenge + " --> " +
 			// challengeList.get(challenge));
-			playerInfo.set("challenges.status." + challenge.replace(".", "[dot]"), challengeList.get(challenge));
+			playerInfo.getNode("challenges", "status", challenge.replace(".", "[dot]"))
+					.setValue(challengeList.get(challenge));
 		}
 		for (String challenge : challengeListTimes.keySet()) {
-			playerInfo.set("challenges.times." + challenge.replace(".", "[dot]"), challengeListTimes.get(challenge));
+			playerInfo.getNode("challenges", "times", challenge.replace(".", "[dot]"))
+					.setValue(challengeListTimes.get(challenge));
 		}
 		// Check what the global limit is
 		if (Settings.resetLimit < this.resetsLeft) {
 			this.resetsLeft = Settings.resetLimit;
 		}
-		playerInfo.set("resetsLeft", this.resetsLeft);
-		playerInfo.set("deaths", deaths);
+		playerInfo.getNode("resetsLeft").setValue(this.resetsLeft);
+		playerInfo.getNode("deaths").setValue(deaths);
 		// Save invite cooldown timers
-		playerInfo.set("invitecooldown", null);
+		playerInfo.getNode("invitecooldown").setValue(null);
 		for (Entry<Location<World>, Date> en : kickedList.entrySet()) {
 			// Convert Location<World> and date to string (time in millis)
 			Calendar coolDownTime = Calendar.getInstance();
 			coolDownTime.setTime(en.getValue());
-			playerInfo.set("invitecooldown." + coolDownTime.getTimeInMillis(), Util.getStringLocation(en.getKey()));
+			playerInfo.getNode("invitecooldown." + coolDownTime.getTimeInMillis())
+					.setValue(Util.getStringLocation(en.getKey()));
 		}
 		// Locale
-		playerInfo.set("locale", locale);
+		playerInfo.getNode("locale").getNode(locale);
 		// Start island rating
 		if (startIslandRating < 1) {
 			// Remove it if the rating is 0 or less
-			playerInfo.set("startIslandRating", null);
+			playerInfo.getNode("startIslandRating").setValue(null);
 		} else {
-			playerInfo.set("startIslandRating", startIslandRating);
+			playerInfo.getNode("startIslandRating").setValue(startIslandRating);
 		}
 		// Island info - to be used if the island.yml file is removed
-		playerInfo.set("islandInfo", null);
+		playerInfo.getNode("islandInfo").setValue(null);
 		if (hasIsland) {
 			Island island = plugin.getGrid().getIsland(uuid);
 			if (island != null) {
-				playerInfo.set("islandInfo", island.save());
+				playerInfo.getNode("islandInfo").setValue(island.save());
 			}
 		}
 		// Control panel
-		playerInfo.set("useControlPanel", useControlPanel);
+		playerInfo.getNode("useControlPanel").setValue(useControlPanel);
 
 		// playerInfo.set("coops", value);
 
 		// Actually save the file
-		Util.saveYamlFile(playerInfo, "players/" + uuid.toString() + ".yml");
+		Util.saveFile(playerInfo, "players/" + uuid.toString() + ".json");
 	}
 
 	/**
