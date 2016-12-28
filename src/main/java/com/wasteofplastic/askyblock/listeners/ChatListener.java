@@ -23,14 +23,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
-
 import com.wasteofplastic.askyblock.ASkyBlock;
 import com.wasteofplastic.askyblock.Settings;
 
@@ -47,7 +39,7 @@ import com.wasteofplastic.askyblock.Settings;
  * @author tastybento
  *
  */
-public class ChatListener implements Listener {
+public class ChatListener {
 
     private ASkyBlock plugin;
     private ConcurrentHashMap<UUID,Boolean> teamChatUsers;

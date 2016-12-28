@@ -229,7 +229,7 @@ public class ASkyBlock {
 			// Save the coops
 			CoopPlay.getInstance().saveCoops();
 		} catch (final Exception e) {
-			getLogger().severe("Something went wrong saving files!");
+			getLogger().error("Something went wrong saving files!");
 			e.printStackTrace();
 		}
 	}
@@ -238,6 +238,16 @@ public class ASkyBlock {
 	public void onInit(GamePreInitializationEvent event) {
 		// instance of this plugin
 		plugin = this;
+
+		// Get challenges
+		challenges = new Challenges(this);
+		// Set and make the player's directory if it does not exist and then
+		// load players into memory
+		playersFolder = new File(configDir() + File.separator + "players");
+		if (!playersFolder.exists()) {
+			playersFolder.mkdir();
+		}
+
 	}
 
 	/*
@@ -264,12 +274,12 @@ public class ASkyBlock {
 		saveDefaultConfig();
 		// Check to see if island distance is set or not
 		if (getConfig().getInt("island.distance", -1) < 1) {
-			getLogger().severe("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+");
-			getLogger().severe("More set up is required. Go to config.yml and edit it.");
-			getLogger().severe("");
-			getLogger().severe("Make sure you set island distance. If upgrading, set it to what it was before.");
-			getLogger().severe("");
-			getLogger().severe("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+");
+			getLogger().error("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+");
+			getLogger().error("More set up is required. Go to config.yml and edit it.");
+			getLogger().error("");
+			getLogger().error("Make sure you set island distance. If upgrading, set it to what it was before.");
+			getLogger().error("");
+			getLogger().error("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+");
 			if (Settings.GAMETYPE.equals(Settings.GameType.ASKYBLOCK)) {
 				getCommand("island").setExecutor(new NotSetup(Reason.DISTANCE));
 				getCommand("asc").setExecutor(new NotSetup(Reason.DISTANCE));
@@ -296,15 +306,6 @@ public class ASkyBlock {
 			}
 			return;
 		}
-		if (Settings.useEconomy && !VaultHelper.setupEconomy()) {
-			getLogger().warning("Could not set up economy! - Running without an economy.");
-			Settings.useEconomy = false;
-		}
-		if (!VaultHelper.setupPermissions()) {
-			getLogger().severe("Cannot link with Vault for permissions! Disabling plugin!");
-			getServer().getPluginManager().disablePlugin(this);
-			return;
-		}
 
 		// This can no longer be run in onEnable because the plugin is loaded at
 		// startup and so key variables are
@@ -317,14 +318,7 @@ public class ASkyBlock {
 		 * WorldCreator.name(Settings.worldName).type(WorldType.FLAT).
 		 * environment(World.Environment.NORMAL).createWorld(); }
 		 */
-		// Get challenges
-		challenges = new Challenges(this);
-		// Set and make the player's directory if it does not exist and then
-		// load players into memory
-		playersFolder = new File(getDataFolder() + File.separator + "players");
-		if (!playersFolder.exists()) {
-			playersFolder.mkdir();
-		}
+
 		players = new PlayerCache(this);
 		// Set up commands for this plugin
 		islandCmd = new IslandCmd(this);
@@ -377,16 +371,16 @@ public class ASkyBlock {
 				getIslandWorld();
 				if (!Settings.useOwnGenerator && getServer().getWorld(Settings.worldName).getGenerator() == null) {
 					// Check if the world generator is registered correctly
-					getLogger().severe("********* The Generator for " + plugin.getName()
+					getLogger().error("********* The Generator for " + plugin.getName()
 							+ " is not registered so the plugin cannot start ********");
-					getLogger().severe(
+					getLogger().error(
 							"If you are using your own generator or server.properties, set useowngenerator: true in config.yml");
-					getLogger().severe("Otherwise:");
-					getLogger().severe("Make sure you have the following in bukkit.yml (case sensitive):");
-					getLogger().severe("worlds:");
-					getLogger().severe("  # The next line must be the name of your world:");
-					getLogger().severe("  " + Settings.worldName + ":");
-					getLogger().severe("    generator: " + plugin.getName());
+					getLogger().error("Otherwise:");
+					getLogger().error("Make sure you have the following in bukkit.yml (case sensitive):");
+					getLogger().error("worlds:");
+					getLogger().error("  # The next line must be the name of your world:");
+					getLogger().error("  " + Settings.worldName + ":");
+					getLogger().error("    generator: " + plugin.getName());
 					if (Settings.GAMETYPE.equals(Settings.GameType.ASKYBLOCK)) {
 						getCommand("island").setExecutor(new NotSetup(Reason.GENERATOR));
 						getCommand("asc").setExecutor(new NotSetup(Reason.GENERATOR));
@@ -404,7 +398,7 @@ public class ASkyBlock {
 					try {
 						getServer().getPluginManager().registerEvents(new HeroChatListener(plugin), plugin);
 					} catch (Exception e) {
-						plugin.getLogger().severe("Could not register with Herochat");
+						plugin.getLogger().error("Could not register with Herochat");
 					}
 				}
 				// Run these one tick later to ensure worlds are loaded.
@@ -653,7 +647,7 @@ public class ASkyBlock {
 			}
 			game.getEventManager().post((new IslandDeleteEvent(player, island.getCenter())));
 		} else {
-			getLogger().severe("Could not delete player: " + player.toString() + " island!");
+			getLogger().error("Could not delete player: " + player.toString() + " island!");
 			getServer().getPluginManager().callEvent(new IslandDeleteEvent(player, null));
 		}
 		players.zeroPlayerData(player);
@@ -760,7 +754,7 @@ public class ASkyBlock {
 				availableLocales.put(code, new ASLocale(this, code, index++));
 			}
 		} catch (IOException e1) {
-			getLogger().severe("Could not add locales!");
+			getLogger().error("Could not add locales!");
 		}
 		// Default is locale.yml
 		availableLocales.put("locale", new ASLocale(this, "locale", 0));
@@ -922,14 +916,14 @@ public class ASkyBlock {
 				islandYaml.load(islandFile);
 				if (!islandYaml.contains(Settings.worldName)) {
 					// Bad news, stop everything and tell the admin
-					getLogger().severe(
+					getLogger().error(
 							"+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+");
-					getLogger().severe("More set up is required. Go to config.yml and edit it.");
-					getLogger().severe("");
-					getLogger().severe("Check island world name is same as world in islands.yml.");
-					getLogger().severe("If you are resetting and changing world, delete island.yml and restart.");
-					getLogger().severe("");
-					getLogger().severe(
+					getLogger().error("More set up is required. Go to config.yml and edit it.");
+					getLogger().error("");
+					getLogger().error("Check island world name is same as world in islands.yml.");
+					getLogger().error("If you are resetting and changing world, delete island.yml and restart.");
+					getLogger().error("");
+					getLogger().error(
 							"+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+");
 					return false;
 				}
@@ -1184,15 +1178,15 @@ public class ASkyBlock {
 				try {
 					Settings.mobWhiteList.add(EntityType.valueOf(mobName.toUpperCase()));
 				} catch (Exception e) {
-					plugin.getLogger().severe("Error in config.yml, mobwhitelist value '" + mobName + "' is invalid.");
+					plugin.getLogger().error("Error in config.yml, mobwhitelist value '" + mobName + "' is invalid.");
 					plugin.getLogger()
-							.severe("Possible values are : Blaze, Cave_Spider, Creeper, Enderman, Endermite, Giant, Guardian, "
+							.error("Possible values are : Blaze, Cave_Spider, Creeper, Enderman, Endermite, Giant, Guardian, "
 									+ "Pig_Zombie, Silverfish, Skeleton, Spider, Witch, Wither, Zombie");
 				}
 			} else {
-				plugin.getLogger().severe("Error in config.yml, mobwhitelist value '" + mobName + "' is invalid.");
+				plugin.getLogger().error("Error in config.yml, mobwhitelist value '" + mobName + "' is invalid.");
 				plugin.getLogger()
-						.severe("Possible values are : Blaze, Cave_Spider, Creeper, Enderman, Endermite, Giant, Guardian, "
+						.error("Possible values are : Blaze, Cave_Spider, Creeper, Enderman, Endermite, Giant, Guardian, "
 								+ "Pig_Zombie, Silverfish, Skeleton, Spider, Witch, Wither, Zombie");
 			}
 		}
@@ -1217,15 +1211,15 @@ public class ASkyBlock {
 									tempChest[i] = new SpawnEgg1_9(type).toItemStack(Integer.parseInt(amountdata[2]));
 								} catch (Exception ex) {
 									tempChest[i] = new ItemStack(Material.MONSTER_EGG);
-									plugin.getLogger().severe("Monster eggs not supported with this server version.");
+									plugin.getLogger().error("Monster eggs not supported with this server version.");
 								}
 							}
 						} catch (Exception e) {
-							Bukkit.getLogger().severe(
+							Bukkit.getLogger().error(
 									"Spawn eggs must be described by name. Try one of these (not all are possible):");
 							for (EntityType type : EntityType.values()) {
 								if (type.isSpawnable() && type.isAlive()) {
-									plugin.getLogger().severe(type.toString());
+									plugin.getLogger().error(type.toString());
 								}
 							}
 						}
@@ -1236,9 +1230,9 @@ public class ASkyBlock {
 							tempChest[i] = Challenges.getPotion(amountdata, Integer.parseInt(amountdata[5]),
 									"config.yml");
 						} else {
-							getLogger().severe(
+							getLogger().error(
 									"Problem loading chest item from config.yml so skipping it: " + chestItemString[i]);
-							getLogger().severe(
+							getLogger().error(
 									"Potions for the chest must be fully defined as POTION:NAME:<LEVEL>:<EXTENDED>:<SPLASH/LINGER>:QTY");
 						}
 					} else {
@@ -1258,15 +1252,15 @@ public class ASkyBlock {
 				} catch (java.lang.IllegalArgumentException ex) {
 					ex.printStackTrace();
 					getLogger()
-							.severe("Problem loading chest item from config.yml so skipping it: " + chestItemString[i]);
-					getLogger().severe("Error is : " + ex.getMessage());
+							.error("Problem loading chest item from config.yml so skipping it: " + chestItemString[i]);
+					getLogger().error("Error is : " + ex.getMessage());
 					getLogger().info("Potential potion types are: ");
 					for (PotionType c : PotionType.values())
 						getLogger().info(c.name());
 				} catch (Exception e) {
 					e.printStackTrace();
 					getLogger()
-							.severe("Problem loading chest item from config.yml so skipping it: " + chestItemString[i]);
+							.error("Problem loading chest item from config.yml so skipping it: " + chestItemString[i]);
 					getLogger().info("Potential material types are: ");
 					for (Material c : Material.values())
 						getLogger().info(c.name());
@@ -1480,7 +1474,7 @@ public class ASkyBlock {
 				}
 			}
 		} else {
-			getLogger().severe("No block values in blockvalues.yml! All island levels will be zero!");
+			getLogger().error("No block values in blockvalues.yml! All island levels will be zero!");
 		}
 		// Biome Settings
 		Settings.biomeCost = getConfig().getDouble("biomesettings.defaultcost", 100D);
@@ -1492,7 +1486,7 @@ public class ASkyBlock {
 		try {
 			Settings.defaultBiome = Biome.valueOf(defaultBiome);
 		} catch (Exception e) {
-			getLogger().severe("Could not parse biome " + defaultBiome + " using PLAINS instead.");
+			getLogger().error("Could not parse biome " + defaultBiome + " using PLAINS instead.");
 			Settings.defaultBiome = Biome.PLAINS;
 		}
 		Settings.breedingLimit = getConfig().getInt("general.breedinglimit", 0);
@@ -1593,7 +1587,7 @@ public class ASkyBlock {
 				} catch (NumberFormatException e) {
 					// Putting the catch here means that an invalid level is
 					// skipped completely
-					getLogger().severe("Unknown level '" + level
+					getLogger().error("Unknown level '" + level
 							+ "' listed in magiccobblegenchances section! Must be an integer or 'default'. Skipping...");
 				}
 			}
